@@ -1,12 +1,16 @@
 from collections.abc import Iterable
-from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
+import concurrent.futures
+import itertools
 import requests
 import time
 #git init   git add main.py   git commit -m ""     git push origin master
-noMatch = True
+
+#noMatch = True
+MAX_THREADS = 10
+
 #Prints url of player if matches given unit and minimum playrate inputs
-def findName(unit,url,min):
+def findName(unit,minimum,url):
     html_text = requests.get(url).text
 
     count = 0
@@ -21,17 +25,17 @@ def findName(unit,url,min):
         if(count >= 10):
             playList.append(name.text)
         count+=1
-        
+    
     for name in tags:
         if(name.a is not None):                             #filter out traits
             champ = name.a.text.replace(' ','').strip()
             numberOfPlays = int(playList[count2-10])     
             #print(champ)
             #print(playList[count2-10])
-            if(champ==unit and numberOfPlays>min):            #searches for given unit + >min # of plays
+            if(champ==unit and numberOfPlays>minimum):            #searches for given unit + >min # of plays
                 print(champ+" is played "+str(numberOfPlays)+" times by: "+url)
                 print()
-                noMatch = False
+                #noMatch = False
             count2+=1    
     
 #Compiles urls for every player present on leaderboard url
@@ -62,35 +66,43 @@ def flatten(lis):
                  yield x
          else:        
              yield item
-             
+
+#Creates multiple threads to run through findName()             
+def multithread(champ, minimum, urlList):
+    threads = min(MAX_THREADS, len(urlList))
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
+        executor.map(findName, itertools.repeat(champ, len(urlList)), itertools.repeat(minimum, len(urlList)), urlList)
+
 def main():
     t0 = time.time()
+    print("Compiling players...")
 
     #INITIALIZE PARAMETERS HERE
     champ = "Gnar"
-    min = 5
+    minimum = 5
     playerList = []
-    #playerList.append(players('https://lolchess.gg/leaderboards?mode=ranked&region=na'))
-    #playerList.append(players('https://lolchess.gg/leaderboards?mode=ranked&region=na&page=2'))
-    #playerList.append(players('https://lolchess.gg/leaderboards?mode=ranked&region=na&page=3'))
-    #playerList.append(players('https://lolchess.gg/leaderboards?mode=ranked&region=kr'))
-    #playerList.append(players('https://lolchess.gg/leaderboards?mode=ranked&region=kr&page=2'))
-    #playerList.append(players('https://lolchess.gg/leaderboards?mode=ranked&region=kr&page=3'))
+    playerList.append(players('https://lolchess.gg/leaderboards?mode=ranked&region=na'))
+    playerList.append(players('https://lolchess.gg/leaderboards?mode=ranked&region=na&page=2'))
+    playerList.append(players('https://lolchess.gg/leaderboards?mode=ranked&region=na&page=3'))
+    playerList.append(players('https://lolchess.gg/leaderboards?mode=ranked&region=kr'))
+    playerList.append(players('https://lolchess.gg/leaderboards?mode=ranked&region=kr&page=2'))
+    playerList.append(players('https://lolchess.gg/leaderboards?mode=ranked&region=kr&page=3'))
     playerList.append(players('https://lolchess.gg/leaderboards?mode=ranked&region=euw'))
-    #playerList.append(players('https://lolchess.gg/leaderboards?mode=ranked&region=euw&page=2'))
-    #playerList.append(players('https://lolchess.gg/leaderboards?mode=ranked&region=euw&page=3'))    
+    playerList.append(players('https://lolchess.gg/leaderboards?mode=ranked&region=euw&page=2'))
+    playerList.append(players('https://lolchess.gg/leaderboards?mode=ranked&region=euw&page=3'))    
     
     playerList = list(flatten(playerList))    
-    print("Summoners who play " + champ + ":")
-    for player in playerList:
-        findName(champ,player,min)
+    print("Finding matching players...")   
+    multithread(champ,minimum,playerList)
+    #for player in playerList:
+    #    findName(champ,minimum,player)
 
-    if(noMatch):
-        print("Sorry, no summoners match the search.")
+    #if(noMatch):
+    #    print("Sorry, no summoners match the search.")
     
     t1 = time.time() 
     print(f"{'%.2f'%(t1-t0)} seconds to analyze {len(playerList)} urls")
     
-
 if __name__ == "__main__":
     main()
